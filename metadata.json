@@ -1,0 +1,8 @@
+{
+  "name": "Remix Rooftop Engineering Inspector",
+  "description": "Mobile app for hotel technicians to perform efficient rooftop equipment inspections, track statuses, and generate maintenance reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
