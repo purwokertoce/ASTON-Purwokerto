@@ -4,6 +4,7 @@ import { INITIAL_USERS, INITIAL_AREA, INITIAL_EQUIPMENT, INITIAL_CHECKLISTS } fr
 const KEYS = {
   USERS: 'eng_rooftop_users',
   CURRENT_USER_ID: 'eng_rooftop_current_user_id',
+  AUTH_SESSION: 'eng_rooftop_auth_session',
   AREAS: 'eng_rooftop_areas',
   EQUIPMENT: 'eng_rooftop_equipment',
   CHECKLISTS: 'eng_rooftop_checklists',
@@ -28,8 +29,11 @@ export function initializeStorage(): void {
     localStorage.setItem(KEYS.USERS, JSON.stringify(INITIAL_USERS));
   }
   if (!localStorage.getItem(KEYS.CURRENT_USER_ID)) {
-    // Default to technician (Agus Prasetyo) for duty inspection flow
-    localStorage.setItem(KEYS.CURRENT_USER_ID, 'user-003');
+    // Default to Chief Engineer / Admin
+    localStorage.setItem(KEYS.CURRENT_USER_ID, 'user-001');
+  }
+  if (!localStorage.getItem(KEYS.AUTH_SESSION)) {
+    localStorage.setItem(KEYS.AUTH_SESSION, 'true');
   }
   if (!localStorage.getItem(KEYS.AREAS)) {
     localStorage.setItem(KEYS.AREAS, JSON.stringify([INITIAL_AREA]));
@@ -49,12 +53,58 @@ export function getUsers(): User[] {
 
 export function getCurrentUser(): User {
   const users = getUsers();
-  const currentId = localStorage.getItem(KEYS.CURRENT_USER_ID) || 'user-003';
+  const currentId = localStorage.getItem(KEYS.CURRENT_USER_ID) || 'user-001';
   return users.find((u) => u.id === currentId) || users[0];
 }
 
 export function setCurrentUserId(userId: string): void {
   localStorage.setItem(KEYS.CURRENT_USER_ID, userId);
+  localStorage.setItem(KEYS.AUTH_SESSION, 'true');
+}
+
+export function isUserAuthenticated(): boolean {
+  return localStorage.getItem(KEYS.AUTH_SESSION) === 'true';
+}
+
+export function getUserByEmail(email: string): User | undefined {
+  const users = getUsers();
+  const cleanEmail = email.trim().toLowerCase();
+  return users.find((u) => u.email.trim().toLowerCase() === cleanEmail);
+}
+
+export function loginWithEmail(email: string, customName?: string, customRole?: 'admin' | 'supervisor' | 'technician'): User {
+  const cleanEmail = email.trim().toLowerCase();
+  const users = getUsers();
+  let user = users.find((u) => u.email.trim().toLowerCase() === cleanEmail);
+
+  if (!user) {
+    // Create new registered user
+    const newId = `user-${Date.now().toString(36)}`;
+    const randomNum = Math.floor(100 + Math.random() * 900);
+    const assignedRole = customRole || (cleanEmail.includes('ce') || cleanEmail.includes('chief') || cleanEmail.includes('admin') ? 'admin' : cleanEmail.includes('spv') || cleanEmail.includes('super') ? 'supervisor' : 'technician');
+    const assignedName = customName || cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    
+    user = {
+      id: newId,
+      name: assignedName,
+      employee_id: `ENG-${randomNum}`,
+      role: assignedRole,
+      email: email.trim(),
+      department: assignedRole === 'admin' ? 'Engineering & Maintenance' : assignedRole === 'supervisor' ? 'Engineering MEP' : 'Shift Engineering',
+      created_at: new Date().toISOString(),
+    };
+
+    users.push(user);
+    localStorage.setItem(KEYS.USERS, JSON.stringify(users));
+  }
+
+  localStorage.setItem(KEYS.CURRENT_USER_ID, user.id);
+  localStorage.setItem(KEYS.AUTH_SESSION, 'true');
+  return user;
+}
+
+export function logoutUser(): void {
+  localStorage.removeItem(KEYS.AUTH_SESSION);
 }
 
 // Equipment

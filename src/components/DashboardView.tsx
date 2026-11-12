@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -15,8 +15,10 @@ import {
   Droplets,
   Wind,
   ShieldCheck,
+  Trash2,
 } from 'lucide-react';
 import { Checklist, ChecklistItem, Equipment, User } from '../types';
+import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 interface DashboardViewProps {
   checklists: Checklist[];
@@ -27,6 +29,7 @@ interface DashboardViewProps {
   onViewReport: (checklistId?: string) => void;
   onViewEquipment: (filterStatus?: string) => void;
   onViewChecklistDetail: (checklist: Checklist) => void;
+  onDeleteChecklist?: (id: string) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -38,7 +41,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onViewReport,
   onViewEquipment,
   onViewChecklistDetail,
+  onDeleteChecklist,
 }) => {
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const todayStr = new Date().toISOString().split('T')[0];
 
   // Find today's latest checklist
@@ -62,6 +67,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const attentionItems = latestToday
     ? latestToday.items.filter((i) => i.status === 'trouble' || i.status === 'warning' || i.operating_status === 'rusak')
     : equipmentList.filter((e) => e.status === 'rusak');
+
+  // Pending admin approval checklists
+  const pendingAdminApprovalChecklists = checklists.filter((c) => !c.admin_approved);
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-24 md:pb-12">
@@ -100,6 +108,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Admin Attention Banner: Checklists Pending Chief Engineer Approval */}
+      {currentUser.role === 'admin' && pendingAdminApprovalChecklists.length > 0 && (
+        <div className="bg-purple-950/40 border border-purple-800/80 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-purple-600/30 text-purple-300 flex items-center justify-center shrink-0 mt-0.5">
+              <ShieldCheck className="w-5 h-5 text-purple-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <span>Perlu Persetujuan Mengetahui Chief Engineer</span>
+                <span className="text-[10px] bg-purple-900 text-purple-200 px-2 py-0.5 rounded-full font-mono uppercase font-bold">
+                  {pendingAdminApprovalChecklists.length} Laporan Pending
+                </span>
+              </h3>
+              <p className="text-xs text-purple-200/80 mt-0.5">
+                Ada {pendingAdminApprovalChecklists.length} laporan hasil inspeksi teknisi rooftop yang menunggu persetujuan mengetahui dari Chief Engineer ({currentUser.name}).
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              const pending = pendingAdminApprovalChecklists[0];
+              if (pending) onViewReport(pending.id);
+            }}
+            className="py-2.5 px-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-colors shadow-md shadow-purple-950 shrink-0 self-start sm:self-center min-h-[40px]"
+          >
+            <span>Tinjau Laporan Sekarang</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Checklist Progress Bar Today */}
       <div className="bg-slate-850 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg">
@@ -394,6 +434,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <p className="text-xs text-slate-400">
                 Inspector: {latestToday.inspector_name} ({latestToday.inspector_employee_id})
               </p>
+              <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                    latestToday.supervisor_approved
+                      ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
+                      : 'bg-amber-950/80 text-amber-300 border border-amber-800'
+                  }`}
+                >
+                  SPV: {latestToday.supervisor_approved ? `✓ Disetujui (${latestToday.supervisor_name || 'SPV'})` : '⏳ Belum Verifikasi'}
+                </span>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                    latestToday.admin_approved
+                      ? 'bg-purple-950/80 text-purple-300 border border-purple-800'
+                      : 'bg-amber-950/80 text-amber-300 border border-amber-800'
+                  }`}
+                >
+                  Chief: {latestToday.admin_approved ? `✓ Diketahui (${latestToday.admin_name || 'Admin'})` : '⏳ Menunggu Approval'}
+                </span>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -408,6 +468,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               >
                 Cetak Laporan
               </button>
+              {onDeleteChecklist && (
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="py-2 px-2.5 bg-slate-800 hover:bg-red-950/60 text-slate-400 hover:text-red-300 rounded-lg text-xs font-semibold transition-colors border border-slate-700 hover:border-red-800/80"
+                  title="Hapus checklist ini"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -416,6 +485,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {latestToday.overall_remark || 'Tidak ada catatan khusus.'}
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation Modal for Dashboard */}
+      {latestToday && (
+        <DeleteConfirmationModal
+          isOpen={showDeleteModal}
+          checklist={latestToday}
+          currentUser={currentUser}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={() => {
+            if (onDeleteChecklist && latestToday) {
+              onDeleteChecklist(latestToday.id);
+            }
+          }}
+        />
       )}
     </div>
   );

@@ -12,8 +12,10 @@ import {
   Clock,
   ArrowUpDown,
   Trash2,
+  CheckCircle,
 } from 'lucide-react';
 import { Checklist, User as UserType } from '../types';
+import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 interface ChecklistHistoryViewProps {
   checklists: Checklist[];
@@ -34,9 +36,12 @@ export const ChecklistHistoryView: React.FC<ChecklistHistoryViewProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedApproval, setSelectedApproval] = useState<string>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [selectedInspector, setSelectedInspector] = useState<string>('all');
+  const [checklistToDelete, setChecklistToDelete] = useState<Checklist | null>(null);
+  const [toastMessage, setToastMessage] = useState<string>('');
 
   // Extract unique inspectors
   const inspectors = useMemo(() => {
@@ -69,6 +74,13 @@ export const ChecklistHistoryView: React.FC<ChecklistHistoryViewProps> = ({
         if (selectedStatus === 'completed' && c.status !== 'completed') return false;
       }
 
+      // Approval filter
+      if (selectedApproval !== 'all') {
+        if (selectedApproval === 'pending_spv' && c.supervisor_approved) return false;
+        if (selectedApproval === 'pending_admin' && c.admin_approved) return false;
+        if (selectedApproval === 'all_approved' && (!c.supervisor_approved || !c.admin_approved)) return false;
+      }
+
       // Date range filter
       if (startDate && c.checklist_date < startDate) return false;
       if (endDate && c.checklist_date > endDate) return false;
@@ -78,7 +90,7 @@ export const ChecklistHistoryView: React.FC<ChecklistHistoryViewProps> = ({
 
       return true;
     });
-  }, [checklists, searchTerm, selectedStatus, startDate, endDate, selectedInspector]);
+  }, [checklists, searchTerm, selectedStatus, selectedApproval, startDate, endDate, selectedInspector]);
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-24 md:pb-12">
@@ -113,7 +125,7 @@ export const ChecklistHistoryView: React.FC<ChecklistHistoryViewProps> = ({
         </div>
 
         {/* Filters grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 text-xs">
           {/* Status Filter */}
           <div>
             <label className="block text-slate-400 mb-1 font-semibold">Status Hasil:</label>
@@ -126,6 +138,21 @@ export const ChecklistHistoryView: React.FC<ChecklistHistoryViewProps> = ({
               <option value="completed">Normal / Selesai (🟢)</option>
               <option value="warning">Ada Warning (🟠)</option>
               <option value="trouble">Ada Trouble (🔴)</option>
+            </select>
+          </div>
+
+          {/* Approval Filter */}
+          <div>
+            <label className="block text-slate-400 mb-1 font-semibold">Status Approval:</label>
+            <select
+              value={selectedApproval}
+              onChange={(e) => setSelectedApproval(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"
+            >
+              <option value="all">Semua Approval</option>
+              <option value="pending_spv">Menunggu SPV</option>
+              <option value="pending_admin">Menunggu Chief Engineer</option>
+              <option value="all_approved">Lengkap (SPV & Chief)</option>
             </select>
           </div>
 
@@ -169,12 +196,13 @@ export const ChecklistHistoryView: React.FC<ChecklistHistoryViewProps> = ({
           </div>
         </div>
 
-        {(searchTerm || selectedStatus !== 'all' || startDate || endDate || selectedInspector !== 'all') && (
+        {(searchTerm || selectedStatus !== 'all' || selectedApproval !== 'all' || startDate || endDate || selectedInspector !== 'all') && (
           <div className="pt-2 flex justify-end">
             <button
               onClick={() => {
                 setSearchTerm('');
                 setSelectedStatus('all');
+                setSelectedApproval('all');
                 setStartDate('');
                 setEndDate('');
                 setSelectedInspector('all');
@@ -231,9 +259,22 @@ export const ChecklistHistoryView: React.FC<ChecklistHistoryViewProps> = ({
                         🟢 Normal Selesai
                       </span>
                     )}
-                    {chk.supervisor_approved && (
-                      <span className="text-[11px] text-emerald-300 bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded-full font-medium">
-                        Disetujui SPV
+                    {chk.supervisor_approved ? (
+                      <span className="text-[10px] text-emerald-300 bg-emerald-950/80 border border-emerald-800/80 px-2 py-0.5 rounded-full font-medium">
+                        ✓ SPV Disetujui
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-amber-300 bg-amber-950/80 border border-amber-800/80 px-2 py-0.5 rounded-full font-medium">
+                        ⏳ SPV Pending
+                      </span>
+                    )}
+                    {chk.admin_approved ? (
+                      <span className="text-[10px] text-purple-300 bg-purple-950/80 border border-purple-800/80 px-2 py-0.5 rounded-full font-medium">
+                        ✓ Chief Diketahui
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-amber-300 bg-amber-950/80 border border-amber-800/80 px-2 py-0.5 rounded-full font-medium">
+                        ⏳ Chief Pending
                       </span>
                     )}
                   </div>
@@ -306,25 +347,43 @@ export const ChecklistHistoryView: React.FC<ChecklistHistoryViewProps> = ({
                     <span>Laporan</span>
                   </button>
 
-                  {currentUser.role === 'admin' && (
-                    <button
-                      onClick={() => {
-                        if (confirm('Yakin ingin menghapus arsip checklist ini?')) {
-                          onDeleteChecklist(chk.id);
-                        }
-                      }}
-                      className="p-2 text-slate-500 hover:text-red-400 rounded-xl transition-colors"
-                      title="Hapus checklist (Admin)"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setChecklistToDelete(chk)}
+                    className="py-2 px-2.5 text-slate-400 hover:text-red-300 hover:bg-red-950/60 border border-slate-700/60 hover:border-red-800/80 rounded-xl transition-colors flex items-center gap-1.5 text-xs min-h-[40px]"
+                    title="Hapus checklist ini"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-400" />
+                    <span className="text-[11px] font-semibold text-red-400">Hapus</span>
+                  </button>
                 </div>
               </div>
             );
           })
         )}
       </div>
+
+      {/* Reusable Delete Confirmation Modal (Reliable in Iframe) */}
+      <DeleteConfirmationModal
+        isOpen={Boolean(checklistToDelete)}
+        checklist={checklistToDelete}
+        currentUser={currentUser}
+        onClose={() => setChecklistToDelete(null)}
+        onConfirm={() => {
+          if (checklistToDelete) {
+            onDeleteChecklist(checklistToDelete.id);
+            setToastMessage(`Checklist tanggal ${checklistToDelete.checklist_date} berhasil dihapus.`);
+            setTimeout(() => setToastMessage(''), 4000);
+          }
+        }}
+      />
+
+      {/* Floating Success Feedback Toast */}
+      {toastMessage && (
+        <div className="fixed bottom-20 md:bottom-6 right-6 z-50 bg-emerald-950 border border-emerald-700 text-emerald-200 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs animate-bounce">
+          <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 };

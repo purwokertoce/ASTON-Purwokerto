@@ -131,6 +131,11 @@ export interface Checklist {
   supervisor_name?: string;
   supervisor_approved_at?: string;
   supervisor_notes?: string;
+  admin_approved?: boolean;
+  admin_id?: string;
+  admin_name?: string;
+  admin_approved_at?: string;
+  admin_notes?: string;
   created_at: string;
   updated_at: string;
 }

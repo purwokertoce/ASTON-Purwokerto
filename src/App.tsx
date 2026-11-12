@@ -14,8 +14,11 @@ import {
   getChecklists,
   saveChecklist,
   deleteChecklist,
+  isUserAuthenticated,
+  loginWithEmail,
+  logoutUser,
 } from './utils/storage';
-import { User, Equipment, Checklist } from './types';
+import { User, Equipment, Checklist, UserRole } from './types';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { DashboardView } from './components/DashboardView';
@@ -26,12 +29,18 @@ import { EquipmentMasterView } from './components/EquipmentMasterView';
 import { ReportView } from './components/ReportView';
 import { SettingsView } from './components/SettingsView';
 import { UserProfileModal } from './components/UserProfileModal';
+import { LoginView } from './components/LoginView';
 
 export default function App() {
   // Initialize storage once on mount
   useEffect(() => {
     initializeStorage();
   }, []);
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    initializeStorage();
+    return isUserAuthenticated();
+  });
 
   const [users, setUsers] = useState<User[]>(() => {
     initializeStorage();
@@ -70,6 +79,20 @@ export default function App() {
     setChecklists(getChecklists());
   };
 
+  // Login with email
+  const handleLogin = (email: string, customName?: string, customRole?: UserRole) => {
+    const user = loginWithEmail(email, customName, customRole);
+    setCurrentUser(user);
+    setUsers(getUsers());
+    setIsAuthenticated(true);
+  };
+
+  // Logout
+  const handleLogout = () => {
+    logoutUser();
+    setIsAuthenticated(false);
+  };
+
   // Switch active user
   const handleSwitchUser = (user: User) => {
     setCurrentUserId(user.id);
@@ -87,7 +110,15 @@ export default function App() {
   // Delete checklist
   const handleDeleteChecklist = (id: string) => {
     deleteChecklist(id);
-    setChecklists(getChecklists());
+    const updated = getChecklists();
+    setChecklists(updated);
+    setEquipmentList(getEquipmentList());
+    if (detailModalChecklist?.id === id) {
+      setDetailModalChecklist(null);
+    }
+    if (selectedReportChecklistId === id) {
+      setSelectedReportChecklistId(updated[0]?.id || undefined);
+    }
   };
 
   // Supervisor approve checklist
@@ -110,11 +141,36 @@ export default function App() {
     setDetailModalChecklist(updated);
   };
 
+  // Chief Engineer (Admin) approve & acknowledge checklist
+  const handleAdminApproveChecklist = (checklistId: string, adminNotes: string) => {
+    const chk = checklists.find((c) => c.id === checklistId);
+    if (!chk) return;
+
+    const updated: Checklist = {
+      ...chk,
+      admin_approved: true,
+      admin_approved_at: new Date().toISOString(),
+      admin_id: currentUser.id,
+      admin_name: currentUser.name,
+      admin_notes: adminNotes,
+      updated_at: new Date().toISOString(),
+    };
+
+    saveChecklist(updated);
+    setChecklists(getChecklists());
+    setDetailModalChecklist(updated);
+  };
+
   // Update master equipment item
   const handleUpdateEquipment = (eq: Equipment) => {
     updateEquipmentItem(eq);
     setEquipmentList(getEquipmentList());
   };
+
+  // Show login screen if not authenticated
+  if (!isAuthenticated) {
+    return <LoginView users={users} onLogin={handleLogin} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white">
@@ -125,6 +181,7 @@ export default function App() {
         onSelectTab={setActiveTab}
         onOpenProfile={() => setShowProfileModal(true)}
         onStartNewChecklist={() => setActiveTab('new-checklist')}
+        onLogout={handleLogout}
       />
 
       {/* Main Body */}
@@ -145,6 +202,7 @@ export default function App() {
               setActiveTab('equipment');
             }}
             onViewChecklistDetail={(chk) => setDetailModalChecklist(chk)}
+            onDeleteChecklist={handleDeleteChecklist}
           />
         )}
 
@@ -187,6 +245,9 @@ export default function App() {
             selectedChecklistId={selectedReportChecklistId}
             currentUser={currentUser}
             onBack={() => setActiveTab('dashboard')}
+            onApproveChecklist={handleApproveChecklist}
+            onAdminApproveChecklist={handleAdminApproveChecklist}
+            onDeleteChecklist={handleDeleteChecklist}
           />
         )}
 
@@ -208,6 +269,7 @@ export default function App() {
         users={users}
         currentUser={currentUser}
         onSwitchUser={handleSwitchUser}
+        onLogout={handleLogout}
       />
 
       {/* Checklist Detail Modal */}
@@ -221,6 +283,8 @@ export default function App() {
             setActiveTab('report');
           }}
           onApproveChecklist={handleApproveChecklist}
+          onAdminApproveChecklist={handleAdminApproveChecklist}
+          onDeleteChecklist={handleDeleteChecklist}
         />
       )}
     </div>

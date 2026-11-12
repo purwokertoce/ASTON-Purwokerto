@@ -10,14 +10,17 @@ import {
   FileText,
   Printer,
   ShieldCheck,
+  Shield,
   Eye,
   Droplets,
   Thermometer,
   Gauge,
   Wind,
+  Trash2,
 } from 'lucide-react';
 import { Checklist, ChecklistItem, InspectionPhoto, User as UserType } from '../types';
 import { PhotoViewerModal } from './PhotoViewerModal';
+import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 interface ChecklistDetailModalProps {
   checklist: Checklist | null;
@@ -25,6 +28,8 @@ interface ChecklistDetailModalProps {
   onClose: () => void;
   onViewReport: (checklistId: string) => void;
   onApproveChecklist?: (checklistId: string, supervisorNotes: string) => void;
+  onAdminApproveChecklist?: (checklistId: string, adminNotes: string) => void;
+  onDeleteChecklist?: (id: string) => void;
 }
 
 export const ChecklistDetailModal: React.FC<ChecklistDetailModalProps> = ({
@@ -33,10 +38,13 @@ export const ChecklistDetailModal: React.FC<ChecklistDetailModalProps> = ({
   onClose,
   onViewReport,
   onApproveChecklist,
+  onAdminApproveChecklist,
+  onDeleteChecklist,
 }) => {
   const [selectedPhoto, setSelectedPhoto] = useState<InspectionPhoto | null>(null);
   const [supervisorNotes, setSupervisorNotes] = useState<string>('');
-  const [isApproving, setIsApproving] = useState<boolean>(false);
+  const [adminNotes, setAdminNotes] = useState<string>('');
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
 
   if (!checklist) return null;
 
@@ -50,7 +58,12 @@ export const ChecklistDetailModal: React.FC<ChecklistDetailModalProps> = ({
   const handleApprove = () => {
     if (onApproveChecklist) {
       onApproveChecklist(checklist.id, supervisorNotes);
-      setIsApproving(false);
+    }
+  };
+
+  const handleAdminApprove = () => {
+    if (onAdminApproveChecklist) {
+      onAdminApproveChecklist(checklist.id, adminNotes);
     }
   };
 
@@ -311,35 +324,44 @@ export const ChecklistDetailModal: React.FC<ChecklistDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Supervisor Approval & Sign-off Section */}
+          {/* 1. Supervisor Approval & Sign-off Section */}
           <div className="p-4 bg-slate-850 rounded-2xl border border-slate-800 space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                Verifikasi & Approval Supervisor
+                1. Verifikasi & Approval Supervisor MEP
               </h4>
               {checklist.supervisor_approved ? (
-                <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                <span className="text-xs text-emerald-400 font-bold flex items-center gap-1 bg-emerald-950/60 border border-emerald-800/80 px-2.5 py-1 rounded-full">
                   <CheckCircle className="w-4 h-4" />
-                  Disetujui oleh {checklist.supervisor_name}
+                  Disetujui: {checklist.supervisor_name}
                 </span>
               ) : (
-                <span className="text-xs text-amber-400 font-medium">Menunggu Verifikasi SPV</span>
+                <span className="text-xs text-amber-400 font-medium bg-amber-950/40 border border-amber-800/60 px-2.5 py-1 rounded-full">
+                  Menunggu Verifikasi SPV
+                </span>
               )}
             </div>
 
             {checklist.supervisor_approved ? (
-              <div className="p-3 bg-slate-900 rounded-xl text-xs space-y-1">
+              <div className="p-3 bg-slate-900 rounded-xl text-xs space-y-1 border border-slate-800/80">
+                <p className="text-slate-300">
+                  <span className="text-slate-400">Verifikator: </span>
+                  <strong className="text-white">{checklist.supervisor_name}</strong>
+                  <span className="text-slate-500 font-mono"> (Supervisor MEP)</span>
+                </p>
                 <p className="text-slate-300">
                   <span className="text-slate-400">Disetujui pada: </span>
-                  {checklist.supervisor_approved_at
-                    ? new Date(checklist.supervisor_approved_at).toLocaleString('id-ID')
-                    : '-'}
+                  <span className="text-emerald-400 font-mono">
+                    {checklist.supervisor_approved_at
+                      ? new Date(checklist.supervisor_approved_at).toLocaleString('id-ID')
+                      : '-'}
+                  </span>
                 </p>
                 {checklist.supervisor_notes && (
-                  <p className="text-slate-300">
+                  <p className="text-slate-300 pt-1 border-t border-slate-800 mt-1">
                     <span className="text-slate-400">Catatan SPV: </span>
-                    {checklist.supervisor_notes}
+                    <span className="italic">"{checklist.supervisor_notes}"</span>
                   </p>
                 )}
               </div>
@@ -349,7 +371,7 @@ export const ChecklistDetailModal: React.FC<ChecklistDetailModalProps> = ({
                   rows={2}
                   value={supervisorNotes}
                   onChange={(e) => setSupervisorNotes(e.target.value)}
-                  placeholder="Beri catatan review hasil checklist teknisi..."
+                  placeholder="Beri catatan review hasil checklist teknisi lapangan..."
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:border-blue-500 focus:outline-none"
                 />
                 <div className="flex justify-end">
@@ -358,30 +380,111 @@ export const ChecklistDetailModal: React.FC<ChecklistDetailModalProps> = ({
                     className="py-2 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-md shadow-emerald-950 transition-colors"
                   >
                     <CheckCircle className="w-4 h-4" />
-                    <span>Setujui & Tandatangani Checklist</span>
+                    <span>Setujui & Tandatangani (Supervisor)</span>
                   </button>
                 </div>
               </div>
             ) : (
               <p className="text-xs text-slate-500">
-                Hanya Supervisor MEP atau Chief Engineer yang dapat menandatangani hasil checklist ini.
+                Hanya Supervisor MEP atau Chief Engineer yang dapat menandatangani verifikasi checklist ini.
+              </p>
+            )}
+          </div>
+
+          {/* 2. Chief Engineer (Admin) Acknowledgment & Approval Section */}
+          <div className="p-4 bg-slate-850 rounded-2xl border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Shield className="w-4 h-4 text-purple-400" />
+                2. Persetujuan Mengetahui Chief Engineer (Admin)
+              </h4>
+              {checklist.admin_approved ? (
+                <span className="text-xs text-purple-300 font-bold flex items-center gap-1 bg-purple-950/60 border border-purple-800/80 px-2.5 py-1 rounded-full">
+                  <CheckCircle className="w-4 h-4 text-purple-400" />
+                  Diketahui: {checklist.admin_name}
+                </span>
+              ) : (
+                <span className="text-xs text-amber-400 font-medium bg-amber-950/40 border border-amber-800/60 px-2.5 py-1 rounded-full">
+                  Menunggu Persetujuan Admin
+                </span>
+              )}
+            </div>
+
+            {checklist.admin_approved ? (
+              <div className="p-3 bg-slate-900 rounded-xl text-xs space-y-1 border border-purple-900/30">
+                <p className="text-slate-300">
+                  <span className="text-slate-400">Chief Engineer: </span>
+                  <strong className="text-white">{checklist.admin_name}</strong>
+                  <span className="text-purple-400 font-mono"> (Admin Department Head)</span>
+                </p>
+                <p className="text-slate-300">
+                  <span className="text-slate-400">Disetujui Mengetahui pada: </span>
+                  <span className="text-purple-300 font-mono">
+                    {checklist.admin_approved_at
+                      ? new Date(checklist.admin_approved_at).toLocaleString('id-ID')
+                      : '-'}
+                  </span>
+                </p>
+                {checklist.admin_notes && (
+                  <p className="text-slate-300 pt-1 border-t border-slate-800 mt-1">
+                    <span className="text-slate-400">Instruksi / Catatan Chief Engineer: </span>
+                    <span className="italic">"{checklist.admin_notes}"</span>
+                  </p>
+                )}
+              </div>
+            ) : currentUser.role === 'admin' ? (
+              <div className="space-y-2 text-xs">
+                <textarea
+                  rows={2}
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                  placeholder="Beri catatan / instruksi tindak lanjut dari Chief Engineer..."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:border-purple-500 focus:outline-none"
+                />
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleAdminApprove}
+                    className="py-2 px-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-md shadow-purple-950 transition-colors"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Setujui Mengetahui Laporan (Chief Engineer)</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">
+                Menunggu login sebagai Chief Engineer (Admin) untuk memberikan tanda tangan persetujuan mengetahui pada laporan ini.
               </p>
             )}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
-          <button
-            onClick={() => {
-              onClose();
-              onViewReport(checklist.id);
-            }}
-            className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Format Cetak PDF</span>
-          </button>
+        <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                onClose();
+                onViewReport(checklist.id);
+              }}
+              className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Format Cetak PDF</span>
+            </button>
+
+            {onDeleteChecklist && (
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="py-2 px-3 bg-red-950/50 hover:bg-red-900/70 text-red-300 border border-red-800/80 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                title="Hapus checklist ini"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                <span>Hapus Checklist</span>
+              </button>
+            )}
+          </div>
+
           <button
             onClick={onClose}
             className="py-2 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold"
@@ -390,6 +493,20 @@ export const ChecklistDetailModal: React.FC<ChecklistDetailModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        checklist={checklist}
+        currentUser={currentUser}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={() => {
+          if (onDeleteChecklist) {
+            onDeleteChecklist(checklist.id);
+            onClose();
+          }
+        }}
+      />
 
       {/* Photo Viewer */}
       {selectedPhoto && (

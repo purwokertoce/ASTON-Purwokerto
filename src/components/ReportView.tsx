@@ -5,20 +5,27 @@ import {
   Calendar,
   User,
   ShieldCheck,
+  Shield,
   AlertTriangle,
   CheckCircle,
   FileSpreadsheet,
   Layers,
   Clock,
   ChevronDown,
+  X,
+  Trash2,
 } from 'lucide-react';
 import { Checklist, User as UserType } from '../types';
+import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 interface ReportViewProps {
   checklists: Checklist[];
   selectedChecklistId?: string;
   currentUser: UserType;
   onBack: () => void;
+  onApproveChecklist?: (checklistId: string, supervisorNotes: string) => void;
+  onAdminApproveChecklist?: (checklistId: string, adminNotes: string) => void;
+  onDeleteChecklist?: (id: string) => void;
 }
 
 export const ReportView: React.FC<ReportViewProps> = ({
@@ -26,10 +33,18 @@ export const ReportView: React.FC<ReportViewProps> = ({
   selectedChecklistId,
   currentUser,
   onBack,
+  onApproveChecklist,
+  onAdminApproveChecklist,
+  onDeleteChecklist,
 }) => {
   const [activeChecklistId, setActiveChecklistId] = useState<string>(
     selectedChecklistId || (checklists[0] ? checklists[0].id : '')
   );
+  const [adminNotesInput, setAdminNotesInput] = useState<string>('');
+  const [spvNotesInput, setSpvNotesInput] = useState<string>('');
+  const [showAdminApprovalModal, setShowAdminApprovalModal] = useState<boolean>(false);
+  const [showSpvApprovalModal, setShowSpvApprovalModal] = useState<boolean>(false);
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
 
   const activeChecklist = useMemo(() => {
     return checklists.find((c) => c.id === activeChecklistId) || checklists[0];
@@ -121,7 +136,7 @@ export const ReportView: React.FC<ReportViewProps> = ({
           >
             {checklists.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.checklist_date} ({c.checklist_time}) - {c.inspector_name}
+                {c.checklist_date} ({c.checklist_time}) - {c.inspector_name} {c.admin_approved ? '✓ Diketahui CE' : ''}
               </option>
             ))}
           </select>
@@ -142,7 +157,79 @@ export const ReportView: React.FC<ReportViewProps> = ({
             <Printer className="w-4 h-4" />
             <span>Cetak / Download PDF</span>
           </button>
+
+          {onDeleteChecklist && (
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="py-2 px-3 bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800/80 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors min-h-[40px]"
+              title="Hapus laporan ini"
+            >
+              <Trash2 className="w-4 h-4 text-red-400" />
+              <span className="hidden sm:inline">Hapus Laporan</span>
+            </button>
+          )}
         </div>
+      </div>
+
+      {/* Action Approval Notification Banners (Screen Only - for Admin & SPV) */}
+      <div className="no-print space-y-3">
+        {/* Chief Engineer / Admin Quick Approval Banner */}
+        {currentUser.role === 'admin' && !activeChecklist.admin_approved && (
+          <div className="p-4 bg-purple-950/40 border border-purple-800/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg animate-fade-in">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-purple-600/30 text-purple-300 flex items-center justify-center shrink-0 mt-0.5">
+                <ShieldCheck className="w-5 h-5 text-purple-400" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>Persetujuan Mengetahui Chief Engineer (Admin)</span>
+                  <span className="text-[10px] bg-purple-900 text-purple-200 px-2 py-0.5 rounded-full uppercase font-mono">
+                    Perlu Approval
+                  </span>
+                </h4>
+                <p className="text-xs text-purple-200/80 mt-0.5">
+                  Anda login sebagai Chief Engineer ({currentUser.name}). Berikan persetujuan mengetahui untuk mengesahkan laporan inspeksi rooftop ini.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowAdminApprovalModal(true)}
+              className="py-2 px-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 shadow-md shadow-purple-950 transition-colors"
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span>Setujui Mengetahui Laporan</span>
+            </button>
+          </div>
+        )}
+
+        {/* Supervisor Quick Approval Banner */}
+        {(currentUser.role === 'supervisor' || currentUser.role === 'admin') && !activeChecklist.supervisor_approved && (
+          <div className="p-4 bg-emerald-950/40 border border-emerald-800/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg animate-fade-in">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-600/30 text-emerald-300 flex items-center justify-center shrink-0 mt-0.5">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>Verifikasi & Tanda Tangan Supervisor MEP</span>
+                  <span className="text-[10px] bg-emerald-900 text-emerald-200 px-2 py-0.5 rounded-full uppercase font-mono">
+                    Belum Diverifikasi
+                  </span>
+                </h4>
+                <p className="text-xs text-emerald-200/80 mt-0.5">
+                  Periksa parameter dan berikan verifikasi hasil temuan checklist lapangan oleh teknisi.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowSpvApprovalModal(true)}
+              className="py-2 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 shadow-md shadow-emerald-950 transition-colors"
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span>Verifikasi & Setujui SPV</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Printable Report Document (Styled for both Screen and High-Res Paper Print) */}
@@ -175,7 +262,7 @@ export const ReportView: React.FC<ReportViewProps> = ({
         </div>
 
         {/* Info Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-slate-100 rounded-xl mb-6 text-xs text-slate-700">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 p-3.5 bg-slate-100 rounded-xl mb-6 text-xs text-slate-700">
           <div>
             <span className="text-slate-500 block text-[10px] uppercase font-bold">Hari, Tanggal</span>
             <p className="font-bold text-slate-900">{dateFormatted}</p>
@@ -190,9 +277,15 @@ export const ReportView: React.FC<ReportViewProps> = ({
             <p className="text-[11px] text-slate-500">{activeChecklist.inspector_employee_id}</p>
           </div>
           <div>
-            <span className="text-slate-500 block text-[10px] uppercase font-bold">Status Verifikasi</span>
-            <p className="font-bold text-emerald-700">
-              {activeChecklist.supervisor_approved ? 'Disetujui SPV' : 'Pemeriksaan Lapangan'}
+            <span className="text-slate-500 block text-[10px] uppercase font-bold">Verifikasi SPV</span>
+            <p className={`font-bold ${activeChecklist.supervisor_approved ? 'text-emerald-700' : 'text-amber-600'}`}>
+              {activeChecklist.supervisor_approved ? `✓ Disetujui (${activeChecklist.supervisor_name || 'SPV'})` : '⏳ Belum Verifikasi'}
+            </p>
+          </div>
+          <div>
+            <span className="text-slate-500 block text-[10px] uppercase font-bold">Mengetahui (Chief)</span>
+            <p className={`font-bold ${activeChecklist.admin_approved ? 'text-purple-700' : 'text-amber-600'}`}>
+              {activeChecklist.admin_approved ? `✓ Diketahui (${activeChecklist.admin_name || 'Chief'})` : '⏳ Menunggu Admin'}
             </p>
           </div>
         </div>
@@ -359,36 +452,228 @@ export const ReportView: React.FC<ReportViewProps> = ({
 
         {/* Signatures Section (3 Roles: Duty Technician, Supervisor, Chief Engineer) */}
         <div className="grid grid-cols-3 gap-4 pt-4 border-t-2 border-slate-800 text-center text-xs">
-          <div className="space-y-12">
-            <span className="text-slate-500 font-semibold block text-[11px]">Dibuat Oleh (Technician)</span>
-            <div className="border-b border-slate-400 mx-6"></div>
+          {/* 1. Duty Technician */}
+          <div className="flex flex-col justify-between min-h-[140px]">
+            <span className="text-slate-500 font-semibold block text-[11px] uppercase tracking-wide">
+              1. Dibuat Oleh (Technician)
+            </span>
+            <div className="my-2">
+              <div className="inline-block px-2.5 py-1 rounded bg-slate-100 border border-slate-300 text-[9px] font-mono font-bold text-slate-700">
+                ✓ SUBMITTED LAPANGAN
+              </div>
+            </div>
             <div>
+              <div className="border-b border-slate-400 mx-4 mb-1.5"></div>
               <p className="font-bold text-slate-900">{activeChecklist.inspector_name}</p>
-              <p className="text-[10px] text-slate-500">ID: {activeChecklist.inspector_employee_id}</p>
+              <p className="text-[10px] text-slate-500 font-mono">ID: {activeChecklist.inspector_employee_id}</p>
             </div>
           </div>
 
-          <div className="space-y-12">
-            <span className="text-slate-500 font-semibold block text-[11px]">Diperiksa Oleh (Supervisor)</span>
-            <div className="border-b border-slate-400 mx-6"></div>
+          {/* 2. Supervisor MEP */}
+          <div className="flex flex-col justify-between min-h-[140px]">
+            <span className="text-slate-500 font-semibold block text-[11px] uppercase tracking-wide">
+              2. Diperiksa Oleh (Supervisor)
+            </span>
+            <div className="my-2">
+              {activeChecklist.supervisor_approved ? (
+                <div className="inline-block px-3 py-1 rounded border-2 border-emerald-600 bg-emerald-50 text-emerald-800 text-[10px] font-bold">
+                  <p className="tracking-wider">✓ VERIFIED & APPROVED</p>
+                  <p className="text-[8px] font-mono text-emerald-700 font-normal">
+                    {activeChecklist.supervisor_approved_at
+                      ? new Date(activeChecklist.supervisor_approved_at).toLocaleDateString('id-ID')
+                      : ''}
+                  </p>
+                </div>
+              ) : (
+                <div className="inline-block px-2 py-1 rounded bg-amber-50 border border-dashed border-amber-400 text-amber-700 text-[9px]">
+                  (Belum Diverifikasi)
+                </div>
+              )}
+            </div>
             <div>
+              <div className="border-b border-slate-400 mx-4 mb-1.5"></div>
               <p className="font-bold text-slate-900">
-                {activeChecklist.supervisor_name || 'Hendra Wijaya'}
+                {activeChecklist.supervisor_name || 'Tri Abidin Suyono'}
               </p>
               <p className="text-[10px] text-slate-500">Supervisor MEP</p>
+              {activeChecklist.supervisor_notes && (
+                <p className="text-[9px] text-slate-500 italic mt-0.5 max-w-[180px] mx-auto truncate">
+                  "{activeChecklist.supervisor_notes}"
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="space-y-12">
-            <span className="text-slate-500 font-semibold block text-[11px]">Diketahui Oleh (Chief Engineer)</span>
-            <div className="border-b border-slate-400 mx-6"></div>
+          {/* 3. Chief Engineer (Admin) */}
+          <div className="flex flex-col justify-between min-h-[140px]">
+            <span className="text-slate-500 font-semibold block text-[11px] uppercase tracking-wide">
+              3. Diketahui Oleh (Chief Engineer)
+            </span>
+            <div className="my-2">
+              {activeChecklist.admin_approved ? (
+                <div className="inline-block px-3 py-1 rounded border-2 border-purple-700 bg-purple-50 text-purple-900 text-[10px] font-bold">
+                  <p className="tracking-wider">✓ APPROVED & ACKNOWLEDGED</p>
+                  <p className="text-[8px] font-mono text-purple-700 font-normal">
+                    {activeChecklist.admin_approved_at
+                      ? new Date(activeChecklist.admin_approved_at).toLocaleDateString('id-ID')
+                      : ''}
+                  </p>
+                </div>
+              ) : (
+                <div className="inline-block px-2 py-1 rounded bg-amber-50 border border-dashed border-amber-400 text-amber-700 text-[9px]">
+                  (Menunggu Persetujuan Mengetahui)
+                </div>
+              )}
+            </div>
             <div>
-              <p className="font-bold text-slate-900">Ir. Bambang Setyawan, MT</p>
+              <div className="border-b border-slate-400 mx-4 mb-1.5"></div>
+              <p className="font-bold text-slate-900">
+                {activeChecklist.admin_name || (currentUser.role === 'admin' ? currentUser.name : 'Surya Budhi')}
+              </p>
               <p className="text-[10px] text-slate-500">Chief Engineer</p>
+              {activeChecklist.admin_notes && (
+                <p className="text-[9px] text-slate-500 italic mt-0.5 max-w-[180px] mx-auto truncate">
+                  "{activeChecklist.admin_notes}"
+                </p>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Admin Approval Modal for Report */}
+      {showAdminApprovalModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in no-print">
+          <div className="w-full max-w-md bg-slate-900 border border-purple-800 rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-purple-400" />
+                <h3 className="text-sm font-bold text-white">Persetujuan Mengetahui Chief Engineer</h3>
+              </div>
+              <button
+                onClick={() => setShowAdminApprovalModal(false)}
+                className="w-7 h-7 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-300 space-y-1">
+              <p>Laporan: <strong>{activeChecklist.checklist_date} ({activeChecklist.checklist_time} WIB)</strong></p>
+              <p>Duty Inspector: <strong>{activeChecklist.inspector_name}</strong></p>
+              <p>Chief Engineer: <strong className="text-purple-400">{currentUser.name}</strong></p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-300">
+                Catatan / Instruksi Tindak Lanjut Chief Engineer (Opsional):
+              </label>
+              <textarea
+                rows={3}
+                value={adminNotesInput}
+                onChange={(e) => setAdminNotesInput(e.target.value)}
+                placeholder="Contoh: Laporan telah diketahui dan disetujui. Jadwalkan servis rutin Heat Pump sesuai SOP..."
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-purple-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowAdminApprovalModal(false)}
+                className="py-2 px-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  if (onAdminApproveChecklist) {
+                    onAdminApproveChecklist(activeChecklist.id, adminNotesInput);
+                  }
+                  setShowAdminApprovalModal(false);
+                }}
+                className="py-2 px-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-purple-950"
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span>Tandatangani Mengetahui Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Supervisor Approval Modal for Report */}
+      {showSpvApprovalModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in no-print">
+          <div className="w-full max-w-md bg-slate-900 border border-emerald-800 rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-sm font-bold text-white">Verifikasi & Approval Supervisor MEP</h3>
+              </div>
+              <button
+                onClick={() => setShowSpvApprovalModal(false)}
+                className="w-7 h-7 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-300 space-y-1">
+              <p>Laporan: <strong>{activeChecklist.checklist_date} ({activeChecklist.checklist_time} WIB)</strong></p>
+              <p>Duty Inspector: <strong>{activeChecklist.inspector_name}</strong></p>
+              <p>Supervisor: <strong className="text-emerald-400">{currentUser.name}</strong></p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-300">
+                Catatan Verifikasi Supervisor (Opsional):
+              </label>
+              <textarea
+                rows={3}
+                value={spvNotesInput}
+                onChange={(e) => setSpvNotesInput(e.target.value)}
+                placeholder="Contoh: Parameter telah diperiksa dan sesuai toleransi standar operasional..."
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowSpvApprovalModal(false)}
+                className="py-2 px-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  if (onApproveChecklist) {
+                    onApproveChecklist(activeChecklist.id, spvNotesInput);
+                  }
+                  setShowSpvApprovalModal(false);
+                }}
+                className="py-2 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-950"
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span>Verifikasi & Tandatangani Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        checklist={activeChecklist}
+        currentUser={currentUser}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={() => {
+          if (onDeleteChecklist) {
+            onDeleteChecklist(activeChecklist.id);
+            onBack();
+          }
+        }}
+      />
     </div>
   );
 };

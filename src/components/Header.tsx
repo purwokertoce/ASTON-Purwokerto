@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, ClipboardList, Shield, ChevronDown } from 'lucide-react';
+import { User, ClipboardList, Shield, ChevronDown, LogOut } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface HeaderProps {
@@ -8,6 +8,7 @@ interface HeaderProps {
   onSelectTab: (tab: string) => void;
   onOpenProfile: () => void;
   onStartNewChecklist: () => void;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectTab,
   onOpenProfile,
   onStartNewChecklist,
+  onLogout,
 }) => {
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -37,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => onSelectTab('dashboard')}
             className="text-left group flex items-center gap-2.5 focus:outline-none"
           >
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-md shadow-blue-900/30">
+            <div className="w-8 h-8 rounded-lg bg-[#fc156c] flex items-center justify-center text-white font-bold text-sm shadow-md shadow-blue-900/30">
               EC
             </div>
             <div>
@@ -139,11 +141,26 @@ export const Header: React.FC<HeaderProps> = ({
                 {currentUser.name}
               </p>
               <p className="text-[10px] text-slate-400 truncate flex items-center gap-1">
-                <span>{getRoleBadge(currentUser.role)}</span>
+                <span className="font-medium text-blue-400">{getRoleBadge(currentUser.role)}</span>
+              </p>
+              <p className="text-[9px] text-slate-500 font-mono truncate max-w-[130px]">
+                {currentUser.email}
               </p>
             </div>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block shrink-0" />
           </button>
+
+          {/* Logout Action */}
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="p-2 sm:px-2.5 sm:py-2 rounded-lg bg-slate-800/80 hover:bg-red-950/60 hover:text-red-300 border border-slate-700 hover:border-red-800 text-slate-400 text-xs font-semibold flex items-center gap-1.5 transition-colors min-h-[40px]"
+              title="Keluar / Logout Akun"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden md:inline">Keluar</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

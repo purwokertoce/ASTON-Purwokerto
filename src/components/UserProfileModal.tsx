@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Check, Shield, Wrench, UserCheck, Mail, IdCard, Building } from 'lucide-react';
+import { X, Check, Shield, Wrench, UserCheck, Mail, IdCard, Building, LogOut } from 'lucide-react';
 import { User, UserRole } from '../types';
 
 interface UserProfileModalProps {
@@ -8,6 +8,7 @@ interface UserProfileModalProps {
   users: User[];
   currentUser: User;
   onSwitchUser: (user: User) => void;
+  onLogout?: () => void;
 }
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({
@@ -16,6 +17,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   users,
   currentUser,
   onSwitchUser,
+  onLogout,
 }) => {
   if (!isOpen) return null;
 
@@ -177,7 +179,21 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-slate-950 border-t border-slate-800 text-right">
+        <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between gap-2">
+          {onLogout ? (
+            <button
+              onClick={() => {
+                onClose();
+                onLogout();
+              }}
+              className="py-2 px-3 bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800/80 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Keluar (Logout)</span>
+            </button>
+          ) : (
+            <div></div>
+          )}
           <button
             onClick={onClose}
             className="py-2 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold"
